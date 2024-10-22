@@ -1,0 +1,9 @@
+run = ["streamlit", "run", "computer_use_demo/streamlit.py"]
+modules = ["python-3.11", "web", "bash"]
+
+[nix]
+channel = "stable-24_05"
+
+[[ports]]
+localPort = 5000
+externalPort = 80
