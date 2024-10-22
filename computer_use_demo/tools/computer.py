@@ -70,20 +70,20 @@ class ComputerTool(BaseAnthropicTool):
 
     @property
     def options(self) -> ComputerToolOptions:
-        width, height = self.scale_coordinates(ScalingSource.COMPUTER,
-                                               self.width, self.height)
+        # width, height = self.scale_coordinates(ScalingSource.COMPUTER,
+        #                                        self.width, self.height)
         return {
-            "display_width_px": width,
-            "display_height_px": height,
+            "display_width_px": 1150,
+            "display_height_px": 1294,
             "display_number": self.display_num,
         }
 
     def __init__(self):
         super().__init__()
 
-        self.width = int(os.getenv("WIDTH") or 0)
-        self.height = int(os.getenv("HEIGHT") or 0)
-        assert self.width and self.height, "WIDTH, HEIGHT must be set"
+        # self.width = int(os.getenv("WIDTH") or 0)
+        # self.height = int(os.getenv("HEIGHT") or 0)
+        # assert self.width and self.height, "WIDTH, HEIGHT must be set"
         if (display_num := os.getenv("DISPLAY_NUM")) is not None:
             self.display_num = int(display_num)
             self._display_prefix = f"DISPLAY=:{self.display_num} "
