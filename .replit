@@ -1,4 +1,4 @@
-run = ["streamlit", "run", "computer_use_demo/streamlit.py"]
+run = ["streamlit", "run", "main.py"]
 modules = ["python-3.11", "web", "bash"]
 
 [nix]

@@ -138,7 +138,7 @@ class Repl:
             case "cursor_position":
                 return await self.cursor_position()
             case _:
-                return ToolResult(error=f"unknown action: {action}")
+                raise ToolError(f"unknown action: {action}")
 
     async def raw_screenshot(self) -> str:
         path = Path(OUTPUT_DIR) / f"screenshot_{uuid4().hex}.png"
@@ -168,8 +168,7 @@ class Repl:
     async def mouse_move(self,
                          coordinate: tuple[int, int] | None) -> ToolResult:
         if not coordinate:
-            return ToolResult(
-                error="for 'mouse_move' action, coordinate is required")
+            raise ToolError("for 'mouse_move' action, coordinate is required")
         return await self.shell("xdotool mousemove --sync %d %d" %
                                 (coordinate[0], coordinate[1]))
 
