@@ -14,6 +14,10 @@ anthropic = "^0.36.2"
 streamlit = "^1.39.0"
 replicate = "^1.0.7"
 joblib = "^1.5.2"
+lightgbm = "^4.6.0"
+scikit-learn = "^1.7.2"
+pandas = "^2.3.2"
+flask = "^3.1.2"
 
 [tool.pyright]
 # https://github.com/microsoft/pyright/blob/main/docs/configuration.md

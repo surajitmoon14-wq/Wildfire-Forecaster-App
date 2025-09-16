@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wildfire Risk Forecaster</title>
+    <!-- Link to Leaflet.js library for the interactive map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+     crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+     crossorigin=""></script>
+
+    <style>
+        /* Basic styling to make the map and UI look good */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            background-color: #f0f2f5;
+        }
+        #map {
+            height: 100%; /* Make the map fill the entire screen */
+            width: 100%;
+            cursor: crosshair;
+        }
+        .title-bar {
+            background-color: #fff;
+            padding: 10px 20px;
+            border-bottom: 1px solid #ddd;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            z-index: 1000; /* Ensure it's on top of the map */
+        }
+        .title-bar h1 {
+            margin: 0;
+            font-size: 1.5em;
+            color: #333;
+        }
+        .title-bar p {
+            margin: 5px 0 0;
+            color: #666;
+        }
+        /* Style for the popup on the map */
+        .leaflet-popup-content-wrapper {
+            border-radius: 8px;
+        }
+        .leaflet-popup-content {
+            font-size: 14px;
+        }
+        .popup-title {
+            font-weight: bold;
+            font-size: 1.1em;
+            margin-bottom: 5px;
+            color: #0056b3;
+        }
+        .popup-loading {
+            color: #888;
+        }
+        .risk-low { color: #28a745; font-weight: bold; }
+        .risk-moderate { color: #ffc107; font-weight: bold; }
+        .risk-high { color: #fd7e14; font-weight: bold; }
+        .risk-extreme { color: #dc3545; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div class="title-bar">
+        <h1>Wildfire Risk Forecaster</h1>
+        <p>Click anywhere on the map of the USA to get a real-time wildfire risk assessment.</p>
+    </div>
+
+    <!-- The map will be rendered inside this div -->
+    <div id="map"></div>
+
+    <script>
+        // --- 1. Initialize the Interactive Map ---
+        // Center the map on the USA
+        const map = L.map('map').setView([39.82, -98.57], 4); 
+
+        // Add the base map layer (tiles from OpenStreetMap)
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        let popup = L.popup();
+
+        // --- 2. Handle User Clicks on the Map ---
+        function onMapClick(e) {
+            const lat = e.latlng.lat;
+            const lng = e.latlng.lng;
+
+            // Show a popup on the map where the user clicked
+            popup
+                .setLatLng(e.latlng)
+                .setContent("<div class='popup-title'>Analyzing Risk...</div><div class='popup-loading'>Contacting the AI brain. Please wait.</div>")
+                .openOn(map);
+
+            // --- 3. Communicate with the Backend "Brain" ---
+            sendRequestToBrain(lat, lng);
+        }
+
+        map.on('click', onMapClick);
+
+        // --- 4. Send the Request to the Flask Server ---
+        async function sendRequestToBrain(latitude, longitude) {
+            try {
+                // The URL of our backend's prediction endpoint
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    // Send the coordinates in the request body
+                    body: JSON.stringify({ latitude: latitude, longitude: longitude }),
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Server responded with status: ${response.status}`);
+                }
+
+                const result = await response.json();
+
+                // --- 5. Display the Brain's Analysis in the Popup ---
+                updatePopupWithResult(latitude, longitude, result);
+
+            } catch (error) {
+                console.error("Error contacting the brain:", error);
+                popup.setContent("<b>Error:</b> Could not get a prediction from the AI brain.");
+            }
+        }
+
+        // --- 6. Update the Popup with the Final Result ---
+        function updatePopupWithResult(lat, lng, result) {
+            const riskClass = `risk-${result.risk_level.toLowerCase()}`;
+
+            const content = `
+                <div class="popup-title">Wildfire Risk Analysis</div>
+                <b>Location:</b> ${lat.toFixed(4)}, ${lng.toFixed(4)}<br>
+                <b>Predicted Size:</b> ${result.predicted_size_acres} acres<br>
+                <b>Risk Level: <span class="${riskClass}">${result.risk_level}</span></b>
+            `;
+            popup.setContent(content);
+        }
+    </script>
+
+</body>
+</html>
+
