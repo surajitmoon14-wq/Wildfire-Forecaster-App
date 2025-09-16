@@ -2,12 +2,13 @@
 # It loads the model from the correct location and is designed to be error-free.
 
 # --- 1. Import necessary libraries ---
-from flask import Flask, request, jsonify, render_template
-import joblib
-import pandas as pd
-import numpy as np
-from datetime import datetime
 import os
+from datetime import datetime
+
+import joblib
+import numpy as np
+import pandas as pd
+from flask import Flask, request, jsonify, render_template
 
 # --- 2. Initialize the Flask App ---
 app = Flask(__name__)
@@ -81,12 +82,13 @@ def home():
 
 @app.route('/predict', methods=['POST'])
 def handle_prediction():
-    if not risk_model:
-        return jsonify({"error": "Model not loaded"}), 500
-
     data = request.get_json()
     lat = data.get('latitude')
     lon = data.get('longitude')
+
+    # Validate input data
+    if lat is None or lon is None:
+        return jsonify({"error": "Missing latitude or longitude"}), 400
 
     today = datetime.now()
     day_of_year = today.timetuple().tm_yday
@@ -94,13 +96,25 @@ def handle_prediction():
     elevation = 1000
     veg_density = 0.5
 
-    predicted_acres = predict_future_risk(lat, lon, year, day_of_year, elevation, veg_density)
-    risk_level = analyze_prediction_and_assign_risk(predicted_acres)
+    try:
+        predicted_acres = predict_future_risk(lat, lon, year, day_of_year, elevation, veg_density)
+        risk_level = analyze_prediction_and_assign_risk(predicted_acres)
 
-    return jsonify({
-        "predicted_size_acres": round(predicted_acres, 2),
-        "risk_level": risk_level
-    })
+        response_data = {
+            "predicted_size_acres": round(predicted_acres, 2),
+            "risk_level": risk_level
+        }
+        
+        # Add demo mode indicator if model isn't loaded
+        if not risk_model:
+            response_data["demo_mode"] = True
+            response_data["note"] = "Running in demo mode with simulated predictions"
+            
+        return jsonify(response_data)
+    
+    except Exception as e:
+        print(f"Error in prediction: {e}")
+        return jsonify({"error": "Prediction failed"}), 500
 
 # --- 7. Run the Server ---
 if __name__ == '__main__':
