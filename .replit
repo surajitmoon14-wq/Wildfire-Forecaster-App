@@ -3,11 +3,7 @@ modules = ["python-3.11", "web", "bash"]
 
 [nix]
 channel = "stable-24_05"
-packages = ["glibcLocales", "ocl-icd", "opencl-headers"]
 
 [[ports]]
 localPort = 5000
 externalPort = 80
-
-[agent]
-expertMode = true
