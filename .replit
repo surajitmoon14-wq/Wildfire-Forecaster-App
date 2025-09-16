@@ -3,7 +3,7 @@ modules = ["python-3.11", "web", "bash"]
 
 [nix]
 channel = "stable-24_05"
-packages = ["glibcLocales", "ocl-icd", "opencl-headers", "gcc", "llvm"]
+packages = ["gcc", "glibcLocales", "llvm", "ocl-icd", "opencl-headers"]
 
 [[ports]]
 localPort = 81
@@ -14,7 +14,7 @@ localPort = 5000
 externalPort = 80
 
 [[ports]]
-localPort = 34851
+localPort = 39101
 externalPort = 3001
 
 [agent]
