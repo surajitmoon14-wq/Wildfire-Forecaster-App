@@ -1,9 +1,4 @@
 <!DOCTYPE html>
-<!--
-        This is the main page for the Wildfire Intelligence Dashboard.
-        It displays an interactive map with wildfire risk forecasts and live weather reports.
-    -->
-
 <html lang="en">
 
 <head>
@@ -28,7 +23,7 @@
         }
 
         #side-panel {
-            width: 350px;
+            width: 380px;
             background-color: #fff;
             box-shadow: 2px 0 5px rgba(0,0,0,0.1);
             z-index: 1000;
@@ -58,15 +53,15 @@
             margin-top: 10px;
         }
 
-        #weather-display {
-            margin-top: 20px;
+        .info-box {
+            margin-top: 15px;
             padding: 15px;
             background-color: #e9f5ff;
             border-radius: 8px;
             border: 1px solid #bde0fe;
         }
-
-        #weather-display h3 {
+        
+        .info-box h3 {
             margin: 0 0 10px 0;
         }
 
@@ -95,12 +90,18 @@
 
     <div id="side-panel">
         <h1>Wildfire Intel</h1>
-        <p>Click the map for a wildfire risk forecast. The live weather for the clicked location will appear below.</p>
-
+        <p>Click the map for a wildfire risk forecast. The live weather and AI safety advice for the clicked location will appear below.</p>
+        
         <h2>Live Weather Report</h2>
-        <div id="weather-display">
+        <div id="weather-display" class="info-box">
             <h3>Weather Report</h3>
-            <div id="weather-content">Click on the map to see the weather for that location.</div>
+            <div id="weather-content">Click on the map to see the weather.</div>
+        </div>
+
+        <h2>AI Safety Assistant</h2>
+        <div id="chatbot-display" class="info-box">
+            <h3>Safety Bulletin</h3>
+            <div id="chatbot-content">Click on the map to get AI-powered advice.</div>
         </div>
     </div>
 
@@ -118,73 +119,91 @@
 
         let popup = L.popup();
         const weatherDisplay = document.getElementById('weather-content');
+        const chatbotDisplay = document.getElementById('chatbot-content');
 
-        // --- 2. Handle Map Clicks for BOTH Wildfire and Weather ---
+        // --- 2. Handle Map Clicks for ALL information ---
         async function onMapClick(e) {
             const lat = e.latlng.lat;
             const lng = e.latlng.lng;
 
-            // Update both the popup and side panel to show loading status
+            // Update UI to show loading status
             popup.setLatLng(e.latlng)
                 .setContent("<div class='popup-title'>Analyzing Wildfire Risk...</div>Please wait.")
                 .openOn(map);
-            weatherDisplay.innerHTML = `Fetching weather for ${lat.toFixed(4)}, ${lng.toFixed(4)}...`;
-
+            weatherDisplay.innerHTML = `Fetching weather...`;
+            chatbotDisplay.innerHTML = `Contacting AI Assistant...`;
+            
             try {
-                // Fetch both results at the same time for speed
-                const [riskResponse, weatherResponse] = await Promise.all([
-                    fetch('/predict', {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({ latitude: lat, longitude: lng }),
-                    }),
+                // --- Step A: Get the Wildfire Prediction ---
+                const riskResponse = await fetch('/predict', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ latitude: lat, longitude: lng }),
+                });
+                if (!riskResponse.ok) throw new Error('Prediction request failed.');
+                const riskResult = await riskResponse.json();
+
+                // --- Step B: Update the map popup with the risk result ---
+                const riskClass = `risk-${riskResult.risk_level.toLowerCase()}`;
+                const riskContent = `
+                    <div class="popup-title">Wildfire Risk Analysis</div>
+                    <b>Location:</b> ${lat.toFixed(4)}, ${lng.toFixed(4)}<br>
+                    <b>Predicted Size:</b> ${riskResult.predicted_size_acres} acres<br>
+                    <b>Risk Level: <span class="${riskClass}">${riskResult.risk_level}</span></b>
+                `;
+                popup.setContent(riskContent);
+
+                // --- Step C: Fetch Weather and AI Advice in parallel ---
+                Promise.all([
                     fetch('/weather', {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify({ latitude: lat, longitude: lng }),
+                    }),
+                    fetch('/get_advice', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        // Send the risk level we just received to the chatbot
+                        body: JSON.stringify({ risk_level: riskResult.risk_level, location_name: `the area near ${lat.toFixed(2)}, ${lng.toFixed(2)}` }),
                     })
-                ]);
-
-                // --- Handle the Wildfire Risk Prediction ---
-                if (!riskResponse.ok) {
-                    popup.setContent("<b>Error:</b> Could not get prediction.");
-                } else {
-                    const result = await riskResponse.json();
-                    const riskClass = `risk-${result.risk_level.toLowerCase()}`;
-                    const content = `
-                        <div class="popup-title">Wildfire Risk Analysis</div>
-                        <b>Location:</b> ${lat.toFixed(4)}, ${lng.toFixed(4)}<br>
-                        <b>Predicted Size:</b> ${result.predicted_size_acres} acres<br>
-                        <b>Risk Level: <span class="${riskClass}">${result.risk_level}</span></b>
-                    `;
-                    popup.setContent(content);
-                }
-
-                // --- Handle the Live Weather Report ---
-                if (!weatherResponse.ok) {
-                    weatherDisplay.innerHTML = "<b>Error:</b> Weather service unavailable.";
-                } else {
-                    const result = await weatherResponse.json();
-                    if (result.error) {
-                        weatherDisplay.innerHTML = `<b>Error:</b> ${result.error}`;
+                ]).then(async ([weatherResponse, adviceResponse]) => {
+                    // Handle Weather
+                    if (weatherResponse.ok) {
+                        const weatherResult = await weatherResponse.json();
+                        weatherDisplay.innerHTML = resultToHtml(weatherResult, "weather", lat, lng);
                     } else {
-                        weatherDisplay.innerHTML = `
-                            <b>Weather for ${lat.toFixed(2)}, ${lng.toFixed(2)}</b><br>
-                            Temperature: ${result.temp_c}°C<br>
-                            Condition: ${result.condition}<br>
-                            Wind: ${result.wind_kph} kph
-                        `;
+                        weatherDisplay.innerHTML = "<b>Error:</b> Weather service unavailable.";
                     }
-                }
+                    // Handle AI Advice
+                    if (adviceResponse.ok) {
+                        const adviceResult = await adviceResponse.json();
+                        chatbotDisplay.innerText = adviceResult.advice; // Use innerText to preserve formatting
+                    } else {
+                        chatbotDisplay.innerHTML = "<b>Error:</b> AI Assistant offline.";
+                    }
+                });
 
             } catch (error) {
-                console.error("Error during fetch:", error);
-                popup.setContent("<b>Error:</b> Could not connect to server.");
+                console.error("Error during analysis:", error);
+                popup.setContent("<b>Error:</b> Could not get prediction.");
                 weatherDisplay.innerHTML = "<b>Error:</b> Connection failed.";
+                chatbotDisplay.innerHTML = "<b>Error:</b> Connection failed.";
             }
         }
         map.on('click', onMapClick);
 
+        function resultToHtml(result, type, lat, lng) {
+            if (result.error) return `<b>Error:</b> ${result.error}`;
+            if (type === "weather") {
+                return `
+                    <b>Weather for ${lat.toFixed(2)}, ${lng.toFixed(2)}</b><br>
+                    Temperature: ${result.temp_c}°C<br>
+                    Condition: ${result.condition}<br>
+                    Wind: ${result.wind_kph} kph
+                `;
+            }
+            return "";
+        }
     </script>
 
 </body>
