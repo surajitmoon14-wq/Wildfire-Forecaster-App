@@ -1,152 +1,190 @@
 <!DOCTYPE html>
+<!--
+        This is the main page for the Wildfire Intelligence Dashboard.
+        It displays an interactive map with wildfire risk forecasts and live weather reports.
+    -->
+
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Wildfire Risk Forecaster</title>
+    <title>Wildfire Intelligence Dashboard</title>
     <!-- Link to Leaflet.js library for the interactive map -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-     crossorigin=""/>
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-     crossorigin=""></script>
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
     <style>
-        /* Basic styling to make the map and UI look good */
+        /* A more professional and organized layout */
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
             margin: 0;
             padding: 0;
             display: flex;
-            flex-direction: column;
             height: 100vh;
             background-color: #f0f2f5;
         }
+
+        #side-panel {
+            width: 350px;
+            background-color: #fff;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        #side-panel h1 {
+            margin: 0 0 5px 0;
+            font-size: 1.8em;
+            color: #333;
+        }
+
+        #side-panel p {
+            margin: 0 0 20px 0;
+            color: #666;
+            font-size: 0.9em;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 20px;
+        }
+
+        #side-panel h2 {
+            font-size: 1.2em;
+            color: #0056b3;
+            margin-top: 10px;
+        }
+
+        #weather-display {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #e9f5ff;
+            border-radius: 8px;
+            border: 1px solid #bde0fe;
+        }
+
+        #weather-display h3 {
+            margin: 0 0 10px 0;
+        }
+
+        #map-container {
+            flex-grow: 1;
+            height: 100vh;
+        }
+
         #map {
-            height: 100%; /* Make the map fill the entire screen */
+            height: 100%;
             width: 100%;
             cursor: crosshair;
         }
-        .title-bar {
-            background-color: #fff;
-            padding: 10px 20px;
-            border-bottom: 1px solid #ddd;
-            text-align: center;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            z-index: 1000; /* Ensure it's on top of the map */
-        }
-        .title-bar h1 {
-            margin: 0;
-            font-size: 1.5em;
-            color: #333;
-        }
-        .title-bar p {
-            margin: 5px 0 0;
-            color: #666;
-        }
-        /* Style for the popup on the map */
-        .leaflet-popup-content-wrapper {
-            border-radius: 8px;
-        }
-        .leaflet-popup-content {
-            font-size: 14px;
-        }
-        .popup-title {
-            font-weight: bold;
-            font-size: 1.1em;
-            margin-bottom: 5px;
-            color: #0056b3;
-        }
-        .popup-loading {
-            color: #888;
-        }
+
+        /* Styles for the map popup */
+        .leaflet-popup-content-wrapper { border-radius: 8px; }
+        .popup-title { font-weight: bold; font-size: 1.2em; margin-bottom: 8px; color: #0056b3; border-bottom: 1px solid #eee; padding-bottom: 5px;}
         .risk-low { color: #28a745; font-weight: bold; }
         .risk-moderate { color: #ffc107; font-weight: bold; }
         .risk-high { color: #fd7e14; font-weight: bold; }
         .risk-extreme { color: #dc3545; font-weight: bold; }
     </style>
 </head>
+
 <body>
 
-    <div class="title-bar">
-        <h1>Wildfire Risk Forecaster</h1>
-        <p>Click anywhere on the map of the USA to get a real-time wildfire risk assessment.</p>
+    <div id="side-panel">
+        <h1>Wildfire Intel</h1>
+        <p>Click the map for a wildfire risk forecast. The live weather for the clicked location will appear below.</p>
+
+        <h2>Live Weather Report</h2>
+        <div id="weather-display">
+            <h3>Weather Report</h3>
+            <div id="weather-content">Click on the map to see the weather for that location.</div>
+        </div>
     </div>
 
-    <!-- The map will be rendered inside this div -->
-    <div id="map"></div>
+    <div id="map-container">
+        <div id="map"></div>
+    </div>
 
     <script>
         // --- 1. Initialize the Interactive Map ---
-        // Center the map on the USA
-        const map = L.map('map').setView([39.82, -98.57], 4); 
-
-        // Add the base map layer (tiles from OpenStreetMap)
+        const map = L.map('map').setView([39.82, -98.57], 4);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
-            attribution: '© OpenStreetMap contributors'
+            attribution: '© OpenStreetMap'
         }).addTo(map);
 
         let popup = L.popup();
+        const weatherDisplay = document.getElementById('weather-content');
 
-        // --- 2. Handle User Clicks on the Map ---
-        function onMapClick(e) {
+        // --- 2. Handle Map Clicks for BOTH Wildfire and Weather ---
+        async function onMapClick(e) {
             const lat = e.latlng.lat;
             const lng = e.latlng.lng;
 
-            // Show a popup on the map where the user clicked
-            popup
-                .setLatLng(e.latlng)
-                .setContent("<div class='popup-title'>Analyzing Risk...</div><div class='popup-loading'>Contacting the AI brain. Please wait.</div>")
+            // Update both the popup and side panel to show loading status
+            popup.setLatLng(e.latlng)
+                .setContent("<div class='popup-title'>Analyzing Wildfire Risk...</div>Please wait.")
                 .openOn(map);
+            weatherDisplay.innerHTML = `Fetching weather for ${lat.toFixed(4)}, ${lng.toFixed(4)}...`;
 
-            // --- 3. Communicate with the Backend "Brain" ---
-            sendRequestToBrain(lat, lng);
-        }
-
-        map.on('click', onMapClick);
-
-        // --- 4. Send the Request to the Flask Server ---
-        async function sendRequestToBrain(latitude, longitude) {
             try {
-                // The URL of our backend's prediction endpoint
-                const response = await fetch('/predict', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    // Send the coordinates in the request body
-                    body: JSON.stringify({ latitude: latitude, longitude: longitude }),
-                });
+                // Fetch both results at the same time for speed
+                const [riskResponse, weatherResponse] = await Promise.all([
+                    fetch('/predict', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ latitude: lat, longitude: lng }),
+                    }),
+                    fetch('/weather', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ latitude: lat, longitude: lng }),
+                    })
+                ]);
 
-                if (!response.ok) {
-                    throw new Error(`Server responded with status: ${response.status}`);
+                // --- Handle the Wildfire Risk Prediction ---
+                if (!riskResponse.ok) {
+                    popup.setContent("<b>Error:</b> Could not get prediction.");
+                } else {
+                    const result = await riskResponse.json();
+                    const riskClass = `risk-${result.risk_level.toLowerCase()}`;
+                    const content = `
+                        <div class="popup-title">Wildfire Risk Analysis</div>
+                        <b>Location:</b> ${lat.toFixed(4)}, ${lng.toFixed(4)}<br>
+                        <b>Predicted Size:</b> ${result.predicted_size_acres} acres<br>
+                        <b>Risk Level: <span class="${riskClass}">${result.risk_level}</span></b>
+                    `;
+                    popup.setContent(content);
                 }
 
-                const result = await response.json();
-
-                // --- 5. Display the Brain's Analysis in the Popup ---
-                updatePopupWithResult(latitude, longitude, result);
+                // --- Handle the Live Weather Report ---
+                if (!weatherResponse.ok) {
+                    weatherDisplay.innerHTML = "<b>Error:</b> Weather service unavailable.";
+                } else {
+                    const result = await weatherResponse.json();
+                    if (result.error) {
+                        weatherDisplay.innerHTML = `<b>Error:</b> ${result.error}`;
+                    } else {
+                        weatherDisplay.innerHTML = `
+                            <b>Weather for ${lat.toFixed(2)}, ${lng.toFixed(2)}</b><br>
+                            Temperature: ${result.temp_c}°C<br>
+                            Condition: ${result.condition}<br>
+                            Wind: ${result.wind_kph} kph
+                        `;
+                    }
+                }
 
             } catch (error) {
-                console.error("Error contacting the brain:", error);
-                popup.setContent("<b>Error:</b> Could not get a prediction from the AI brain.");
+                console.error("Error during fetch:", error);
+                popup.setContent("<b>Error:</b> Could not connect to server.");
+                weatherDisplay.innerHTML = "<b>Error:</b> Connection failed.";
             }
         }
+        map.on('click', onMapClick);
 
-        // --- 6. Update the Popup with the Final Result ---
-        function updatePopupWithResult(lat, lng, result) {
-            const riskClass = `risk-${result.risk_level.toLowerCase()}`;
-
-            const content = `
-                <div class="popup-title">Wildfire Risk Analysis</div>
-                <b>Location:</b> ${lat.toFixed(4)}, ${lng.toFixed(4)}<br>
-                <b>Predicted Size:</b> ${result.predicted_size_acres} acres<br>
-                <b>Risk Level: <span class="${riskClass}">${result.risk_level}</span></b>
-            `;
-            popup.setContent(content);
-        }
     </script>
 
 </body>
